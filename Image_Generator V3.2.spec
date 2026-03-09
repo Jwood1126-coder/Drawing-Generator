@@ -1,12 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
+import customtkinter
+import os
 
+ctk_path = os.path.dirname(customtkinter.__file__)
 
 a = Analysis(
     ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[
+        ('modules', 'modules'),
+        ('panels', 'panels'),
+        (ctk_path, 'customtkinter'),
+    ],
+    hiddenimports=[
+        'customtkinter',
+        'PIL',
+        'openpyxl',
+        'pandas',
+        'tkinter',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
