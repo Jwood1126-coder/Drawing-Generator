@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# PyInstaller
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Test/sample data files
+*.xlsx
+*.PDF
+*.pdf
+*.jpg
+*.png
+output/
+
+# Archive (old versions, Tauri project with node_modules, etc.)
+_Archive/
