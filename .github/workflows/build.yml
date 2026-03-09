@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for changelog generation
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,3 +45,4 @@ jobs:
         with:
           files: dist/Image_Generator V3.2.exe
           generate_release_notes: true
+          make_latest: true
