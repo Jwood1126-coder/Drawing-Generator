@@ -19,6 +19,8 @@ a = Analysis(
         'openpyxl',
         'pandas',
         'tkinter',
+        'fitz',
+        'pymupdf',
     ],
     hookspath=[],
     hooksconfig={},
