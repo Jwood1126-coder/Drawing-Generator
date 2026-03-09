@@ -367,6 +367,183 @@ class ModernProgressBar(ctk.CTkProgressBar):
 
 
 
+class SearchableComboBox(ctk.CTkFrame):
+    """A searchable dropdown that keeps focus while typing.
+
+    Uses a CTkEntry + a Toplevel listbox popup instead of CTkComboBox,
+    which loses focus when values are reconfigured.
+    """
+
+    def __init__(self, parent, values=None, width=240, command=None, **kwargs):
+        super().__init__(parent, fg_color="transparent", **kwargs)
+        self._all_values = list(values or [])
+        self._command = command
+        self._popup = None
+        self._debounce_id = None
+
+        self._entry = ctk.CTkEntry(
+            self, width=width, height=32, corner_radius=8,
+            border_width=1, font=ctk.CTkFont(size=12),
+            fg_color=T().bg_tertiary, border_color=T().border,
+            text_color=T().text_white, placeholder_text_color=T().text_dim,
+        )
+        self._entry.pack(side="left", fill="x", expand=True)
+
+        self._btn = ctk.CTkButton(
+            self, text="\u25BC", width=28, height=32, corner_radius=8,
+            fg_color=T().accent_dim, hover_color=T().accent,
+            text_color=T().bg_primary if T().ctk_mode == "dark" else "#ffffff",
+            font=ctk.CTkFont(size=10),
+            command=self._toggle_popup,
+        )
+        self._btn.pack(side="left", padx=(2, 0))
+
+        self._entry.bind("<KeyRelease>", self._on_key)
+        self._entry.bind("<Return>", self._on_enter)
+        self._entry.bind("<Escape>", lambda e: self._close_popup())
+        self._entry.bind("<FocusOut>", self._on_focus_out)
+        self._entry.bind("<Down>", self._on_arrow_down)
+
+        ThemeManager.register(self._update_theme)
+
+    def _update_theme(self):
+        self._entry.configure(
+            fg_color=T().bg_tertiary, border_color=T().border,
+            text_color=T().text_white, placeholder_text_color=T().text_dim,
+        )
+        self._btn.configure(
+            fg_color=T().accent_dim, hover_color=T().accent,
+            text_color=T().bg_primary if T().ctk_mode == "dark" else "#ffffff",
+        )
+
+    def get(self):
+        return self._entry.get()
+
+    def set(self, value):
+        self._entry.delete(0, "end")
+        self._entry.insert(0, value)
+
+    def configure(self, **kwargs):
+        if "values" in kwargs:
+            self._all_values = list(kwargs.pop("values"))
+        super().configure(**kwargs)
+
+    def _on_key(self, event):
+        if event.keysym in ("Return", "Escape", "Tab", "Down", "Up"):
+            return
+        # Debounce: wait 150ms after last keystroke before filtering
+        if self._debounce_id is not None:
+            self.after_cancel(self._debounce_id)
+        self._debounce_id = self.after(150, self._show_filtered)
+
+    def _show_filtered(self):
+        self._debounce_id = None
+        search = self._entry.get().lower().strip()
+        if not search:
+            filtered = self._all_values
+        else:
+            filtered = [v for v in self._all_values if search in v.lower()]
+        self._show_popup(filtered)
+
+    def _toggle_popup(self):
+        if self._popup and self._popup.winfo_exists():
+            self._close_popup()
+        else:
+            self._show_popup(self._all_values)
+            self._entry.focus_set()
+
+    def _show_popup(self, values):
+        if not values:
+            self._close_popup()
+            return
+
+        if self._popup and self._popup.winfo_exists():
+            # Reuse existing popup — just update contents
+            lb = self._listbox
+            lb.delete(0, "end")
+            for v in values:
+                lb.insert("end", v)
+            # Resize height
+            h = min(len(values), 8) * 20 + 4
+            self._popup.geometry(
+                f"{self._entry.winfo_width() + 30}x{h}"
+                f"+{self._entry.winfo_rootx()}+{self._entry.winfo_rooty() + self._entry.winfo_height() + 2}"
+            )
+            return
+
+        self._popup = tk.Toplevel(self)
+        self._popup.wm_overrideredirect(True)
+        self._popup.attributes("-topmost", True)
+
+        x = self._entry.winfo_rootx()
+        y = self._entry.winfo_rooty() + self._entry.winfo_height() + 2
+        w = self._entry.winfo_width() + 30
+        h = min(len(values), 8) * 20 + 4
+        self._popup.geometry(f"{w}x{h}+{x}+{y}")
+
+        self._listbox = tk.Listbox(
+            self._popup,
+            bg=T().bg_secondary, fg=T().text_white,
+            selectbackground=T().accent_dim, selectforeground=T().text_white,
+            highlightthickness=1, highlightbackground=T().border,
+            relief="flat", font=("Segoe UI", 10), activestyle="none",
+            borderwidth=1,
+        )
+        self._listbox.pack(fill="both", expand=True)
+        for v in values:
+            self._listbox.insert("end", v)
+
+        self._listbox.bind("<<ListboxSelect>>", self._on_select)
+        self._listbox.bind("<Return>", self._on_select)
+
+    def _on_select(self, event=None):
+        if not self._listbox.curselection():
+            return
+        value = self._listbox.get(self._listbox.curselection()[0])
+        self.set(value)
+        self._close_popup()
+        if self._command:
+            self._command(value)
+
+    def _on_enter(self, event=None):
+        # If popup is open and something is selected, pick it
+        if self._popup and self._popup.winfo_exists() and self._listbox.curselection():
+            self._on_select()
+        # Otherwise fire the command with current text
+        elif self._command:
+            self._command(self.get())
+
+    def _on_arrow_down(self, event=None):
+        if self._popup and self._popup.winfo_exists():
+            self._listbox.focus_set()
+            if not self._listbox.curselection():
+                self._listbox.selection_set(0)
+
+    def _on_focus_out(self, event=None):
+        # Delay close so click on listbox can register
+        self.after(200, self._maybe_close)
+
+    def _maybe_close(self):
+        try:
+            focused = self.focus_get()
+            if self._popup and self._popup.winfo_exists():
+                if focused and (focused == self._listbox or focused == self._entry):
+                    return
+            self._close_popup()
+        except KeyError:
+            self._close_popup()
+
+    def _close_popup(self):
+        if self._popup and self._popup.winfo_exists():
+            self._popup.destroy()
+        self._popup = None
+
+    def destroy(self):
+        self._close_popup()
+        ThemeManager.unregister(self._update_theme)
+        super().destroy()
+
+
 class ThemedListbox(tk.Listbox):
     """A tkinter Listbox that updates with theme changes."""
 

@@ -31,7 +31,8 @@ from modules.utils import sanitize_filename
 from themes import T, ThemeManager, THEMES
 from widgets import (
     ModernCard, ModernSection, ModernButton, ModernEntry, ModernLabel,
-    ModernCheckbox, ModernDropdown, ThemedListbox, ThemedCanvas, StatusBar
+    ModernCheckbox, ModernDropdown, ThemedListbox, ThemedCanvas, StatusBar,
+    SearchableComboBox
 )
 from panels import TemplateFieldsPanel, ExportSettingsPanel, TemplateEditorCanvas
 
@@ -562,20 +563,12 @@ class PartDrawingGeneratorApp(ctk.CTk):
 
         proj_sel_row = ctk.CTkFrame(self._project_card, fg_color="transparent")
         proj_sel_row.pack(fill="x", padx=8, pady=(2, 2))
-        self._project_combo = ctk.CTkComboBox(
+        self._project_combo = SearchableComboBox(
             proj_sel_row, values=[], width=240,
-            font=ctk.CTkFont(size=12),
-            dropdown_font=ctk.CTkFont(size=12),
-            fg_color=T().bg_tertiary, border_color=T().border,
-            button_color=T().accent_dim, button_hover_color=T().accent,
-            dropdown_fg_color=T().bg_secondary, dropdown_hover_color=T().bg_hover,
-            dropdown_text_color=T().text_primary, text_color=T().text_primary,
             command=lambda v: None  # no-op; user must click Load
         )
         self._project_combo.pack(side="left", fill="x", expand=True, padx=(0, 4))
         self._project_combo.set("")
-        # Live search: filter and open dropdown as user types; Enter loads
-        self._project_combo._entry.bind("<KeyRelease>", lambda e: self._on_project_combo_key(e))
         self._project_combo._entry.bind("<Return>", lambda e: self._load_state())
         ModernButton(proj_sel_row, "Load", self._load_state, variant="secondary", width=50, height=28).pack(side="left", padx=2)
         ModernButton(proj_sel_row, "Delete", self._delete_state, variant="ghost", width=55, height=28).pack(side="left", padx=2)
@@ -616,20 +609,12 @@ class PartDrawingGeneratorApp(ctk.CTk):
 
         tmpl_combo_row = ctk.CTkFrame(lib_section.content, fg_color="transparent")
         tmpl_combo_row.pack(fill="x", pady=4)
-        self._tmpl_combo = ctk.CTkComboBox(
+        self._tmpl_combo = SearchableComboBox(
             tmpl_combo_row, values=[], width=280,
-            font=ctk.CTkFont(size=12),
-            dropdown_font=ctk.CTkFont(size=12),
-            fg_color=T().bg_tertiary, border_color=T().border,
-            button_color=T().accent_dim, button_hover_color=T().accent,
-            dropdown_fg_color=T().bg_secondary, dropdown_hover_color=T().bg_hover,
-            dropdown_text_color=T().text_primary, text_color=T().text_primary,
             command=lambda v: None
         )
         self._tmpl_combo.pack(side="left", fill="x", expand=True)
         self._tmpl_combo.set("")
-        # Live search: filter and open dropdown as user types; Enter applies
-        self._tmpl_combo._entry.bind("<KeyRelease>", lambda e: self._on_tmpl_combo_key(e))
         self._tmpl_combo._entry.bind("<Return>", lambda e: self._load_template())
 
         tmpl_btns = ctk.CTkFrame(lib_section.content, fg_color="transparent")
@@ -1548,35 +1533,6 @@ class PartDrawingGeneratorApp(ctk.CTk):
             self._project_combo.configure(values=self._all_saved_states)
             if self._current_project_name:
                 self._project_combo.set(self._current_project_name)
-
-    def _combo_search_open(self, combo, all_values):
-        """Filter combo dropdown values without stealing focus."""
-        search = combo.get().lower().strip()
-        if not search:
-            combo.configure(values=all_values)
-        else:
-            filtered = [n for n in all_values if search in n.lower()]
-            combo.configure(values=filtered)
-
-    def _on_project_combo_key(self, event):
-        """Filter project dropdown as user types."""
-        if event.keysym in ("Return", "Escape", "Tab"):
-            return
-        # Cancel any pending search to debounce rapid keystrokes
-        if hasattr(self, '_project_search_after'):
-            self.after_cancel(self._project_search_after)
-        self._project_search_after = self.after(
-            150, lambda: self._combo_search_open(self._project_combo, self._all_saved_states))
-
-    def _on_tmpl_combo_key(self, event):
-        """Filter template dropdown as user types."""
-        if event.keysym in ("Return", "Escape", "Tab"):
-            return
-        # Cancel any pending search to debounce rapid keystrokes
-        if hasattr(self, '_tmpl_search_after'):
-            self.after_cancel(self._tmpl_search_after)
-        self._tmpl_search_after = self.after(
-            150, lambda: self._combo_search_open(self._tmpl_combo, self._all_template_names))
 
     def _save_as_project(self):
         """Clone current project under a new name."""
