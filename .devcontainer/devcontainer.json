@@ -1,0 +1,22 @@
+{
+  "name": "Drawing Generator",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "pip install -r requirements.txt && sudo apt-get update -qq && sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get install -y -qq xvfb x11vnc novnc websockify openbox",
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": {
+      "label": "GUI Preview (noVNC)",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}
