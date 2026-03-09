@@ -1550,33 +1550,33 @@ class PartDrawingGeneratorApp(ctk.CTk):
                 self._project_combo.set(self._current_project_name)
 
     def _combo_search_open(self, combo, all_values):
-        """Filter combo dropdown values and open it, restoring focus to entry."""
+        """Filter combo dropdown values without stealing focus."""
         search = combo.get().lower().strip()
         if not search:
             combo.configure(values=all_values)
         else:
             filtered = [n for n in all_values if search in n.lower()]
             combo.configure(values=filtered)
-        entry = combo._entry
-        pos = entry.index("insert")
-        try:
-            combo._open_dropdown_menu()
-        except Exception:
-            pass
-        # Schedule focus restore after dropdown has finished grabbing focus
-        self.after(20, lambda: (entry.focus_set(), entry.icursor(pos)))
 
     def _on_project_combo_key(self, event):
-        """Filter project dropdown and auto-open as user types."""
+        """Filter project dropdown as user types."""
         if event.keysym in ("Return", "Escape", "Tab"):
             return
-        self._combo_search_open(self._project_combo, self._all_saved_states)
+        # Cancel any pending search to debounce rapid keystrokes
+        if hasattr(self, '_project_search_after'):
+            self.after_cancel(self._project_search_after)
+        self._project_search_after = self.after(
+            150, lambda: self._combo_search_open(self._project_combo, self._all_saved_states))
 
     def _on_tmpl_combo_key(self, event):
-        """Filter template dropdown and auto-open as user types."""
+        """Filter template dropdown as user types."""
         if event.keysym in ("Return", "Escape", "Tab"):
             return
-        self._combo_search_open(self._tmpl_combo, self._all_template_names)
+        # Cancel any pending search to debounce rapid keystrokes
+        if hasattr(self, '_tmpl_search_after'):
+            self.after_cancel(self._tmpl_search_after)
+        self._tmpl_search_after = self.after(
+            150, lambda: self._combo_search_open(self._tmpl_combo, self._all_template_names))
 
     def _save_as_project(self):
         """Clone current project under a new name."""
@@ -1942,8 +1942,8 @@ class PartDrawingGeneratorApp(ctk.CTk):
 
         name = self._tmpl_combo.get().strip()
         if not name:
-            if self.template_path:
-                name = Path(self.template_path).stem
+            if self._current_template_name:
+                name = self._current_template_name
                 self._tmpl_combo.set(name)
             else:
                 messagebox.showwarning("Warning", "Enter a name for the template.")
